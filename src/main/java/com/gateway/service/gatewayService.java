@@ -1,21 +1,28 @@
 package com.gateway.service;
 
 
+import com.gateway.queue.DeadLetterQueue;
 import com.gateway.queue.RequestQueue;
 import com.gateway.worker.Worker;
 import com.gateway.model.Request;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import com.gateway.handler.RequestResultHandler;
 
-public class gatewayService {
+
+public class gatewayService implements RequestResultHandler{
 
     private final RequestQueue requestQueue;
     private final ExecutorService executorService;
+    private final DeadLetterQueue deadLetterQueue;
+    private static final int MAX_RETRY=3;
 
     public gatewayService(int workerCount)
     {
         this.requestQueue = new RequestQueue();
         this.executorService = Executors.newFixedThreadPool(workerCount);
+        this.deadLetterQueue = new DeadLetterQueue();
+
 
         startWorkers(workerCount);
     }
@@ -23,7 +30,7 @@ public class gatewayService {
     {
         for (int i=0;i<workerCount;i++)
         {
-            executorService.submit(new Worker(requestQueue));
+            executorService.submit(new Worker(requestQueue, this));
         }
     }
     public void submitRequest(Request request)
@@ -43,6 +50,46 @@ public class gatewayService {
             System.out.println(
                     "Request submission interrupted"
             );
+        }
+    }
+    @Override
+    public void onSuccess(Request r)
+    {
+        System.out.println(
+                "Request "
+                        + r.getId()
+                        + " processed successfully"
+        );
+    }
+    @Override
+    public void onFailure(Request r)
+    {
+        try
+        {
+            if(r.getRetryCount()<MAX_RETRY)
+            {
+                r.incrementRetry();
+                requestQueue.addRequest(r);
+                System.out.println(
+                        "Retrying Request "
+                                + request.getId()
+                                + " Attempt: "
+                                + request.getRetryCount()
+                );
+            }
+            else
+            {
+                System.out.println(
+                        "Moving Request "
+                                + request.getId()
+                                + " to DLQ"
+                );
+                deadLetterQueue.addFailedRequest(r);
+            }
+        }
+        catch (InterruptedException e)
+        {
+            Thread.currentThread().interrupt();
         }
     }
     public void shutdown()

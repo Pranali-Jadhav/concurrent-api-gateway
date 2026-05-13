@@ -63,4 +63,8 @@ public class Request implements Comparable<Request> {
                 ", status=" + status +
                 ", retries=" + retryCount + "}";
     }
+
+    public void incrementRetry() {
+        this.retryCount++;
+    }
 }
