@@ -72,16 +72,16 @@ public class gatewayService implements RequestResultHandler{
                 requestQueue.addRequest(r);
                 System.out.println(
                         "Retrying Request "
-                                + request.getId()
+                                + r.getId()
                                 + " Attempt: "
-                                + request.getRetryCount()
+                                + r.getRetryCount()
                 );
             }
             else
             {
                 System.out.println(
                         "Moving Request "
-                                + request.getId()
+                                + r.getId()
                                 + " to DLQ"
                 );
                 deadLetterQueue.addFailedRequest(r);
